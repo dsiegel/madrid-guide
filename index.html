@@ -31,7 +31,7 @@ button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(-
 button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .cat-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .sort{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
-.ages[hidden],.subrow[hidden]{display:none}
+.ages[hidden],.subrow[hidden],.subcats[hidden]{display:none}
 .subrow{flex-basis:100%;min-width:0;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .subcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
 .subcats::-webkit-scrollbar{display:none}
@@ -84,8 +84,7 @@ footer{max-width:1200px;margin:0 auto;padding:16px;font-size:12px;color:var(--mu
 <div class="controls"><div class="controls-inner">
   <div class="cats" id="cats"></div>
   <div class="sort">Sort <button id="sort-rating" aria-pressed="true">Rating</button><button id="sort-dist" aria-pressed="false">Distance</button></div>
-  <div class="subrow" id="subrow" hidden><div class="subcats" id="subcats"></div><div class="sort" id="dist">Walk <button data-max="5" aria-pressed="false">≤5 min</button><button data-max="10" aria-pressed="false">≤10 min</button><button data-max="20" aria-pressed="false">≤20 min</button><button data-max="" aria-pressed="true">Any</button></div></div>
-  <div class="sort ages" id="ages" hidden>Child's age <button data-age="" aria-pressed="true">Any</button><button data-age="3" aria-pressed="false">3+</button><button data-age="5" aria-pressed="false">5+</button><button data-age="7" aria-pressed="false">7+</button></div>
+  <div class="subrow" id="subrow" hidden><div class="subcats" id="subcats"></div><div class="sort" id="dist">Walk <button data-max="5" aria-pressed="false">≤5 min</button><button data-max="10" aria-pressed="false">≤10 min</button><button data-max="20" aria-pressed="false">≤20 min</button><button data-max="" aria-pressed="true">Any</button></div><div class="sort ages" id="ages" hidden>Child's age <button data-age="" aria-pressed="true">Any</button><button data-age="3" aria-pressed="false">3+</button><button data-age="5" aria-pressed="false">5+</button><button data-age="7" aria-pressed="false">7+</button></div></div>
 </div></div>
 <main>
   <div id="map" role="region" aria-label="Map"></div>
@@ -118,17 +117,19 @@ footer{max-width:1200px;margin:0 auto;padding:16px;font-size:12px;color:var(--mu
   function render(){
     var resto=cat==='restaurants',all=resto&&!sub;
     document.getElementById('ages').hidden=cat!=='kids';
-    document.getElementById('subrow').hidden=!resto;
+    var walkable=resto||cat==='kids';
+    document.getElementById('subrow').hidden=!walkable;
+    document.getElementById('subcats').hidden=!resto;
     fitMap();
     var ps=D.places.filter(function(p){
       if(resto?(sub?p.category!==sub:RCATS.indexOf(p.category)<0):p.category!==cat)return false;
       if(cat==='kids'&&age!=null&&!(p.min_age<=age&&p.max_age>=age))return false;
-      return !resto||maxMin==null||walkMin(p.km)<=maxMin});
+      return !walkable||maxMin==null||walkMin(p.km)<=maxMin});
     var cmp=sort==='rating'?function(a,b){var ma=a.low_conf?1:0,mb=b.low_conf?1:0;return (ma-mb)||(b.avg||0)-(a.avg||0)||(b.n_sources-a.n_sources)}:function(a,b){return a.km-b.km};
     // In the all-restaurants view, fine dining comes after everything else
     ps.sort(all?function(a,b){return ((a.category==='fine')-(b.category==='fine'))||cmp(a,b)}:cmp);
     var list=document.getElementById('list');list.innerHTML='';layer.clearLayers();markers={};
-    if(!ps.length){list.innerHTML='<p class="empty">'+(resto&&maxMin!=null?'Nothing within a '+maxMin+'-minute walk. Try a wider range.':'Nothing here yet.')+'</p>';return}
+    if(!ps.length){list.innerHTML='<p class="empty">'+(walkable&&maxMin!=null?'Nothing within a '+maxMin+'-minute walk. Try a wider range.':'Nothing here yet.')+'</p>';return}
     var bounds=[[D.hotel.lat,D.hotel.lng]];
     ps.forEach(function(p,i){
       var id='p'+i;
