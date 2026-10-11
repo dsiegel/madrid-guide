@@ -31,6 +31,7 @@ button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(-
 button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .cat-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .sort{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted)}
+.sort button:disabled{opacity:.35;cursor:default}
 .ages[hidden],.subrow[hidden],.subcats[hidden]{display:none}
 .subrow{flex-basis:100%;min-width:0;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .subcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
@@ -121,15 +122,21 @@ footer{max-width:1200px;margin:0 auto;padding:16px;font-size:12px;color:var(--mu
     document.getElementById('subrow').hidden=false;
     document.getElementById('subcats').hidden=!resto;
     fitMap();
-    var ps=D.places.filter(function(p){
+    var base=D.places.filter(function(p){
       if(resto?(sub?p.category!==sub:RCATS.indexOf(p.category)<0):p.category!==cat)return false;
-      if(cat==='kids'&&age!=null&&!(p.min_age<=age&&p.max_age>=age))return false;
-      return !walkable||maxMin==null||walkMin(p.km)<=maxMin});
+      return !(cat==='kids'&&age!=null&&!(p.min_age<=age&&p.max_age>=age))});
+    // Gray out walk ranges with no places; if the chosen one is empty, widen to the next that has some
+    var btns=document.querySelectorAll('#dist button');
+    function has(m){return m==null||base.some(function(p){return walkMin(p.km)<=m})}
+    var eff=maxMin;
+    if(!has(eff)){var opts=[5,10,20];eff=null;for(var k=0;k<opts.length;k++)if(opts[k]>maxMin&&has(opts[k])){eff=opts[k];break}}
+    btns.forEach(function(x){var m=x.dataset.max?+x.dataset.max:null;x.disabled=!has(m);x.setAttribute('aria-pressed',String(m===eff))});
+    var ps=base.filter(function(p){return eff==null||walkMin(p.km)<=eff});
     var cmp=sort==='rating'?function(a,b){var ma=a.low_conf?1:0,mb=b.low_conf?1:0;return (ma-mb)||(b.avg||0)-(a.avg||0)||(b.n_sources-a.n_sources)}:function(a,b){return a.km-b.km};
     // In the all-restaurants view, fine dining comes after everything else
     ps.sort(all?function(a,b){return ((a.category==='fine')-(b.category==='fine'))||cmp(a,b)}:cmp);
     var list=document.getElementById('list');list.innerHTML='';layer.clearLayers();markers={};
-    if(!ps.length){list.innerHTML='<p class="empty">'+(walkable&&maxMin!=null?'Nothing within a '+maxMin+'-minute walk. Try a wider range.':'Nothing here yet.')+'</p>';return}
+    if(!ps.length){list.innerHTML='<p class="empty">'+'Nothing here yet.'+'</p>';return}
     var bounds=[[D.hotel.lat,D.hotel.lng]];
     ps.forEach(function(p,i){
       var id='p'+i;
@@ -184,7 +191,7 @@ footer{max-width:1200px;margin:0 auto;padding:16px;font-size:12px;color:var(--mu
     b.addEventListener('click',function(){sub=c[0]||null;sync()});
     subsEl.appendChild(b);
   });
-  document.querySelectorAll('#dist button').forEach(function(b){b.addEventListener('click',function(){maxMin=b.dataset.max?+b.dataset.max:null;document.querySelectorAll('#dist button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});render()})});
+  document.querySelectorAll('#dist button').forEach(function(b){b.addEventListener('click',function(){maxMin=b.dataset.max?+b.dataset.max:null;render()})});
   ['rating','dist'].forEach(function(s){document.getElementById('sort-'+s).addEventListener('click',function(){sort=s;document.getElementById('sort-rating').setAttribute('aria-pressed',String(s==='rating'));document.getElementById('sort-dist').setAttribute('aria-pressed',String(s==='dist'));render()})});
   document.querySelectorAll('#ages button').forEach(function(b){b.addEventListener('click',function(){age=b.dataset.age?+b.dataset.age:null;document.querySelectorAll('#ages button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});render()})});
   sync();
